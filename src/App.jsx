@@ -1,4 +1,4 @@
-t } from "react";
+import { useState, useEffect } from "react";
 
 const PRICE_PER_PACK = 12.5;
 const CIGS_PER_PACK = 20;
