@@ -313,13 +313,13 @@ const s = {
   navBtn: { flex: 1, background: "none", border: "none", color: "rgba(242,232,213,0.35)", fontSize: 12, padding: "8px 0", borderRadius: 10, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontWeight: 700, transition: "all 0.2s", letterSpacing: "0.3px" },
   navActive: { background: "rgba(232,168,56,0.12)", color: "#e8a838" },
 
-  page: { flex: 1, overflowY: "auto", padding: "14px 16px 20px", display: "flex", flexDirection: "column", gap: 10, position: "relative", zIndex: 1 },
+  page: { flex: 1, overflow: "hidden", padding: "14px 16px 20px", display: "flex", flexDirection: "column", gap: 10, position: "relative", zIndex: 1, justifyContent: "space-between" },
 
   header: { textAlign: "center", marginBottom: 2 },
   logo: { fontSize: 28 },
   title: { fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, margin: "2px 0 0", letterSpacing: "-1px", color: "#f2e8d5" },
 
-  card: { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "14px 16px 12px" },
+on  card: { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "14px 16px 12px" },
   cardLabel: { fontFamily: "'DM Mono', monospace", fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: 2, margin: "0 0 10px" },
   cardSub: { fontFamily: "'DM Mono', monospace", fontSize: 11, opacity: 0.45, textAlign: "center", margin: "6px 0 0" },
 
