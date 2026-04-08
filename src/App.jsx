@@ -306,7 +306,7 @@ export default function SmokeTracker() {
 }
 
 const s = {
-  root: { height: "100vh", width: "100%", background: "#1a1208", color: "#f2e8d5", fontFamily: "'Syne', sans-serif", display: "flex", flexDirection: "column", maxWidth: 440, margin: "0 auto", position: "relative", overflow: "hidden" },
+  root: { height: "100dvh", width: "100%", background: "#1a1208", color: "#f2e8d5", fontFamily: "'Syne', sans-serif", display: "flex", flexDirection: "column", maxWidth: 440, margin: "0 auto", position: "relative", overflow: "hidden" },
   grain: { position: "fixed", inset: 0, backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E\")", opacity: 0.4, pointerEvents: "none", zIndex: 0 },
 
   nav: { display: "flex", gap: 4, padding: "12px 16px 0", background: "rgba(26,18,8,0.95)", flexShrink: 0, position: "relative", zIndex: 2 },
