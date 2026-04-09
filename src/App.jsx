@@ -30,7 +30,7 @@ function getDaysInMonth(k) {
   return days;
 }
 function formatDate(dateStr) {
-  return new Date(dateStr + "T12:00:00").toLocaleDateString("fr-CA", { weekday: "short", day: "numeric", month: "short" });
+  return new Date(dateStr + "T12:00:00").toLocaleDateString("fr-CA", { weekday: "long", day: "numeric", month: "long" });
 }
 function formatTime(min) {
   if (min < 60) return `${Math.round(min)}min`;
@@ -50,6 +50,7 @@ export default function App() {
   const [factIndex, setFactIndex] = useState(0);
   const [pulse, setPulse] = useState(false);
   const [historyMonth, setHistoryMonth] = useState(getMonthKey(getToday()));
+  const [popup, setPopup] = useState(null);
 
   const today = getToday();
   const todayCount = data.days[today] || 0;
@@ -67,6 +68,16 @@ export default function App() {
   function removeCig() {
     if (!todayCount) return;
     setData(p => ({ ...p, days: { ...p.days, [today]: p.days[today] - 1 } }));
+  }
+
+  function openPopup(day) {
+    if (day > today) return;
+    setPopup({ day, inputVal: String(data.days[day] || 0) });
+  }
+  function savePopup() {
+    const count = Math.max(0, parseInt(popup.inputVal) || 0);
+    setData(p => ({ ...p, days: { ...p.days, [popup.day]: count } }));
+    setPopup(null);
   }
 
   const totalCigs = Object.values(data.days).reduce((a, b) => a + b, 0);
@@ -103,14 +114,44 @@ export default function App() {
         @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
         button { cursor: pointer; }
         button:active { opacity: 0.7; }
-        select option { background: #1a1208; color: #f2e8d5; }
+        input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
         ::-webkit-scrollbar { display: none; }
       `}</style>
 
       <div style={{ height: "100dvh", width: "100%", background: "#1a1208", color: "#f2e8d5", fontFamily: "'Syne', sans-serif", display: "flex", flexDirection: "column", maxWidth: 440, margin: "0 auto", overflow: "hidden", position: "relative" }}>
 
-        {/* Grain overlay */}
         <div style={{ position: "absolute", inset: 0, backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E\")", opacity: 0.4, pointerEvents: "none", zIndex: 0 }} />
+
+        {/* Popup */}
+        {popup && (
+          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 32px" }} onClick={() => setPopup(null)}>
+            <div style={{ background: "#221508", border: "1px solid rgba(232,168,56,0.2)", borderRadius: 20, padding: "24px 20px", width: "100%", display: "flex", flexDirection: "column", gap: 16 }} onClick={e => e.stopPropagation()}>
+              <div>
+                <p style={{ fontSize: 11, opacity: 0.4, fontFamily: "'DM Mono'", textTransform: "uppercase", letterSpacing: 2, marginBottom: 4 }}>modifier</p>
+                <p style={{ fontSize: 14, fontWeight: 700, textTransform: "capitalize" }}>{formatDate(popup.day)}</p>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <input
+                  type="number"
+                  value={popup.inputVal}
+                  onChange={e => setPopup(p => ({ ...p, inputVal: e.target.value }))}
+                  style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(232,168,56,0.25)", borderRadius: 12, color: "#f2e8d5", fontSize: 28, fontWeight: 700, fontFamily: "'Syne'", padding: "10px 14px", textAlign: "center", outline: "none" }}
+                  autoFocus
+                />
+                <span style={{ fontSize: 16, opacity: 0.5, fontFamily: "'DM Mono'" }}>cig</span>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {[0, 1, 2, 3, 4, 5].map(v => (
+                  <button key={v} onClick={() => setPopup(p => ({ ...p, inputVal: String(v) }))} style={{ flex: 1, background: "rgba(232,168,56,0.1)", border: "1px solid rgba(232,168,56,0.2)", borderRadius: 10, color: "#f2e8d5", fontSize: 13, fontWeight: 700, padding: "8px 0" }}>{v}</button>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setPopup(null)} style={{ flex: 1, background: "rgba(255,255,255,0.05)", border: "none", borderRadius: 12, color: "rgba(242,232,213,0.5)", fontSize: 14, fontWeight: 600, padding: "12px 0" }}>annuler</button>
+                <button onClick={savePopup} style={{ flex: 2, background: "#e8a838", border: "none", borderRadius: 12, color: "#1a1208", fontSize: 14, fontWeight: 700, padding: "12px 0" }}>enregistrer</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Nav */}
         <div style={{ display: "flex", gap: 4, padding: "12px 14px 8px", flexShrink: 0, zIndex: 2, background: "#1a1208" }}>
@@ -124,13 +165,11 @@ export default function App() {
         {/* ── HOME ── */}
         {view === "home" && (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "8px 16px 16px", gap: 10, zIndex: 1, overflow: "hidden" }}>
-
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 26 }}>🚬</div>
               <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-1px" }}>smoke<em>less</em></h1>
             </div>
 
-            {/* Counter */}
             <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "14px 16px 10px", flexShrink: 0 }}>
               <p style={{ fontFamily: "'DM Mono'", fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: 2, marginBottom: 10 }}>aujourd'hui</p>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20 }}>
@@ -146,7 +185,6 @@ export default function App() {
               </p>
             </div>
 
-            {/* 7 days chart */}
             <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "12px 14px 10px", flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
               <p style={{ fontFamily: "'DM Mono'", fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: 2, marginBottom: 8, flexShrink: 0 }}>7 derniers jours</p>
               <div style={{ display: "flex", alignItems: "flex-end", gap: 5, flex: 1, minHeight: 0 }}>
@@ -162,7 +200,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Fact */}
             <div style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "10px 14px", flexShrink: 0 }}>
               <span style={{ fontSize: 14 }}>💡</span>
               <p key={factIndex} style={{ fontSize: 11, lineHeight: 1.55, opacity: 0.65, animation: "fadeUp 0.5s ease" }}>{HEALTH_FACTS[factIndex]}</p>
@@ -173,7 +210,6 @@ export default function App() {
         {/* ── STATS ── */}
         {view === "stats" && (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "8px 16px 16px", gap: 10, zIndex: 1, overflow: "hidden" }}>
-
             <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-1px", textAlign: "center" }}>stats</h1>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, flexShrink: 0 }}>
@@ -242,8 +278,9 @@ export default function App() {
               ))}
             </div>
 
-            {/* Calendar */}
+            {/* Calendrier cliquable */}
             <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "12px 10px", flexShrink: 0 }}>
+              <p style={{ fontFamily: "'DM Mono'", fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: 2, marginBottom: 8 }}>appuie sur un jour pour modifier</p>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
                 {["dim","lun","mar","mer","jeu","ven","sam"].map(d => (
                   <div key={d} style={{ textAlign: "center", fontSize: 8, opacity: 0.3, fontFamily: "'DM Mono'", paddingBottom: 4 }}>{d}</div>
@@ -255,16 +292,16 @@ export default function App() {
                   const isFuture = day > today;
                   const intensity = hasData ? Math.min(count / maxDayMonth, 1) : 0;
                   return (
-                    <div key={day} style={{ borderRadius: 7, padding: "4px 2px", display: "flex", flexDirection: "column", alignItems: "center", gap: 1, minHeight: 36, background: isFuture ? "transparent" : hasData ? `rgba(232,168,56,${0.08 + intensity * 0.5})` : "transparent", border: day === today ? "1px solid rgba(232,168,56,0.6)" : "1px solid transparent", opacity: isFuture ? 0.2 : 1 }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.65 }}>{+day.split("-")[2]}</span>
+                    <button key={day} onClick={() => openPopup(day)} style={{ borderRadius: 7, padding: "4px 2px", display: "flex", flexDirection: "column", alignItems: "center", gap: 1, minHeight: 38, background: isFuture ? "transparent" : hasData ? `rgba(232,168,56,${0.08 + intensity * 0.5})` : "rgba(255,255,255,0.02)", border: day === today ? "1px solid rgba(232,168,56,0.6)" : "1px solid transparent", opacity: isFuture ? 0.2 : 1, cursor: isFuture ? "default" : "pointer" }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.65, color: "#f2e8d5" }}>{+day.split("-")[2]}</span>
                       {!isFuture && hasData && <span style={{ fontSize: 11, fontWeight: 800, color: "#e8a838" }}>{count}</span>}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* List */}
+            {/* Liste */}
             <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "10px 14px", flex: 1, overflowY: "auto", minHeight: 0 }}>
               <p style={{ fontFamily: "'DM Mono'", fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: 2, marginBottom: 6 }}>détail</p>
               {monthDays.filter(d => d <= today).reverse().map(day => {
@@ -273,7 +310,7 @@ export default function App() {
                 return (
                   <div key={day} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                     <span style={{ fontSize: 12, width: 18, textAlign: "center" }}>{hasData ? (count === 0 ? "✦" : "🚬") : "·"}</span>
-                    <span style={{ flex: 1, fontSize: 11, opacity: 0.55, textTransform: "capitalize" }}>{formatDate(day)}</span>
+                    <span style={{ flex: 1, fontSize: 11, opacity: 0.55, textTransform: "capitalize" }}>{new Date(day + "T12:00:00").toLocaleDateString("fr-CA", { weekday: "short", day: "numeric", month: "short" })}</span>
                     <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "'DM Mono'", color: hasData ? (count <= 2 ? "#e8a838" : count <= 4 ? "#c97b2a" : "#e05555") : "rgba(242,232,213,0.2)" }}>
                       {hasData ? `${count} cig` : "—"}
                     </span>
