@@ -18,50 +18,35 @@ const HEALTH_FACTS = [
 function getToday() {
   return new Date().toISOString().split("T")[0];
 }
-
-function getMonthKey(dateStr) { return dateStr.slice(0, 7); }
-
-function getMonthLabel(monthKey) {
-  const [y, m] = monthKey.split("-");
+function getMonthKey(d) { return d.slice(0, 7); }
+function getMonthLabel(k) {
+  const [y, m] = k.split("-");
   return new Date(+y, +m - 1, 1).toLocaleDateString("fr-CA", { month: "long", year: "numeric" });
 }
-
-function getDaysInMonth(monthKey) {
-  const [y, m] = monthKey.split("-");
-  const days = [];
-  const d = new Date(+y, +m - 1, 1);
-  while (d.getMonth() === +m - 1) {
-    days.push(d.toISOString().split("T")[0]);
-    d.setDate(d.getDate() + 1);
-  }
+function getDaysInMonth(k) {
+  const [y, m] = k.split("-");
+  const days = [], d = new Date(+y, +m - 1, 1);
+  while (d.getMonth() === +m - 1) { days.push(d.toISOString().split("T")[0]); d.setDate(d.getDate() + 1); }
   return days;
 }
-
 function formatDate(dateStr) {
   return new Date(dateStr + "T12:00:00").toLocaleDateString("fr-CA", { weekday: "short", day: "numeric", month: "short" });
 }
-
-function formatTime(minutes) {
-  if (minutes < 60) return `${Math.round(minutes)}min`;
-  const h = Math.floor(minutes / 60);
-  const m = Math.round(minutes % 60);
+function formatTime(min) {
+  if (min < 60) return `${Math.round(min)}min`;
+  const h = Math.floor(min / 60), m = Math.round(min % 60);
   return m > 0 ? `${h}h${m}` : `${h}h`;
 }
-
 function loadData() {
   try {
-    const raw = localStorage.getItem("smoketracker_v1");
-    return raw ? JSON.parse(raw) : { days: {}, startDate: getToday() };
+    const r = localStorage.getItem("smoketracker_v1");
+    return r ? JSON.parse(r) : { days: {}, startDate: getToday() };
   } catch { return { days: {}, startDate: getToday() }; }
 }
 
-function saveData(data) {
-  localStorage.setItem("smoketracker_v1", JSON.stringify(data));
-}
-
-export default function SmokeTracker() {
+export default function App() {
   const [data, setData] = useState(loadData);
-  const [view, setView] = useState("home"); // home | stats | history
+  const [view, setView] = useState("home");
   const [factIndex, setFactIndex] = useState(0);
   const [pulse, setPulse] = useState(false);
   const [historyMonth, setHistoryMonth] = useState(getMonthKey(getToday()));
@@ -69,7 +54,7 @@ export default function SmokeTracker() {
   const today = getToday();
   const todayCount = data.days[today] || 0;
 
-  useEffect(() => { saveData(data); }, [data]);
+  useEffect(() => { localStorage.setItem("smoketracker_v1", JSON.stringify(data)); }, [data]);
   useEffect(() => {
     const i = setInterval(() => setFactIndex(f => (f + 1) % HEALTH_FACTS.length), 6000);
     return () => clearInterval(i);
@@ -77,18 +62,18 @@ export default function SmokeTracker() {
 
   function addCig() {
     setPulse(true); setTimeout(() => setPulse(false), 400);
-    setData(prev => ({ ...prev, days: { ...prev.days, [today]: (prev.days[today] || 0) + 1 } }));
+    setData(p => ({ ...p, days: { ...p.days, [today]: (p.days[today] || 0) + 1 } }));
   }
   function removeCig() {
-    if (todayCount === 0) return;
-    setData(prev => ({ ...prev, days: { ...prev.days, [today]: prev.days[today] - 1 } }));
+    if (!todayCount) return;
+    setData(p => ({ ...p, days: { ...p.days, [today]: p.days[today] - 1 } }));
   }
 
   const totalCigs = Object.values(data.days).reduce((a, b) => a + b, 0);
   const totalMoney = totalCigs * PRICE_PER_CIG;
-  const totalMinutes = totalCigs * MINUTES_PER_CIG;
+  const totalMin = totalCigs * MINUTES_PER_CIG;
   const dayCount = Math.max(Object.keys(data.days).length, 1);
-  const avgPerDay = (totalCigs / dayCount).toFixed(1);
+  const avg = totalCigs / dayCount;
 
   const last7 = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i));
@@ -97,285 +82,208 @@ export default function SmokeTracker() {
   });
   const maxBar = Math.max(...last7.map(d => d.count), 1);
 
-  // History
   const allMonths = (() => {
     const keys = new Set(Object.keys(data.days).map(getMonthKey));
     keys.add(getMonthKey(today));
     return Array.from(keys).sort().reverse();
   })();
   const monthDays = getDaysInMonth(historyMonth);
-  const firstDayOfWeek = new Date(historyMonth + "-01T12:00:00").getDay();
+  const firstDOW = new Date(historyMonth + "-01T12:00:00").getDay();
   const monthTotal = monthDays.reduce((a, d) => a + (data.days[d] || 0), 0);
-  const monthMoney = (monthTotal * PRICE_PER_CIG).toFixed(0);
-  const maxDayInMonth = Math.max(...monthDays.map(d => data.days[d] || 0), 1);
+  const maxDayMonth = Math.max(...monthDays.map(d => data.days[d] || 0), 1);
+  const monthDaysLogged = monthDays.filter(d => d <= today && data.days[d] !== undefined);
 
   return (
-    <div style={s.root}>
-      <div style={s.grain} />
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital@0;1&display=swap');
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body, #root { height: 100%; width: 100%; overflow: hidden; background: #1a1208; }
+        @keyframes pulseAnim { 0%{transform:scale(1)} 50%{transform:scale(1.15)} 100%{transform:scale(1)} }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+        button { cursor: pointer; }
+        button:active { opacity: 0.7; }
+        select option { background: #1a1208; color: #f2e8d5; }
+        ::-webkit-scrollbar { display: none; }
+      `}</style>
 
-      {/* Nav */}
-      <div style={s.nav}>
-        <button style={{ ...s.navBtn, ...(view === "home" ? s.navActive : {}) }} onClick={() => setView("home")}>aujourd'hui</button>
-        <button style={{ ...s.navBtn, ...(view === "stats" ? s.navActive : {}) }} onClick={() => setView("stats")}>stats</button>
-        <button style={{ ...s.navBtn, ...(view === "history" ? s.navActive : {}) }} onClick={() => setView("history")}>historique</button>
-      </div>
+      <div style={{ height: "100dvh", width: "100%", background: "#1a1208", color: "#f2e8d5", fontFamily: "'Syne', sans-serif", display: "flex", flexDirection: "column", maxWidth: 440, margin: "0 auto", overflow: "hidden", position: "relative" }}>
 
-      {/* ── HOME ── */}
-      {view === "home" && (
-        <div style={s.page}>
-          <div style={s.header}>
-            <span style={s.logo}>🚬</span>
-            <h1 style={s.title}>smoke<em>less</em></h1>
-          </div>
+        {/* Grain overlay */}
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E\")", opacity: 0.4, pointerEvents: "none", zIndex: 0 }} />
 
-          <div style={s.card}>
-            <p style={s.cardLabel}>aujourd'hui</p>
-            <div style={s.counterRow}>
-              <button style={s.btnMinus} onClick={removeCig}>−</button>
-              <div style={{ ...s.countDisplay, ...(pulse ? s.pulse : {}) }}>
-                <span style={s.countNum}>{todayCount}</span>
-                <span style={s.countUnit}>cig</span>
-              </div>
-              <button style={s.btnPlus} onClick={addCig}>+</button>
+        {/* Nav */}
+        <div style={{ display: "flex", gap: 4, padding: "12px 14px 8px", flexShrink: 0, zIndex: 2, background: "#1a1208" }}>
+          {["home", "stats", "history"].map(v => (
+            <button key={v} onClick={() => setView(v)} style={{ flex: 1, background: view === v ? "rgba(232,168,56,0.12)" : "rgba(255,255,255,0.04)", border: "none", color: view === v ? "#e8a838" : "rgba(242,232,213,0.35)", fontSize: 12, padding: "8px 0", borderRadius: 10, fontFamily: "'Syne', sans-serif", fontWeight: 700, letterSpacing: "0.3px" }}>
+              {v === "home" ? "aujourd'hui" : v === "stats" ? "stats" : "historique"}
+            </button>
+          ))}
+        </div>
+
+        {/* ── HOME ── */}
+        {view === "home" && (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "8px 16px 16px", gap: 10, zIndex: 1, overflow: "hidden" }}>
+
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 26 }}>🚬</div>
+              <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-1px" }}>smoke<em>less</em></h1>
             </div>
-            <p style={s.cardSub}>
-              ≈ {(todayCount * PRICE_PER_CIG).toFixed(2)} $ · {formatTime(todayCount * MINUTES_PER_CIG)} de vie
-            </p>
-          </div>
 
-          <div style={s.card}>
-            <p style={s.cardLabel}>7 derniers jours</p>
-            <div style={s.chartRow}>
-              {last7.map(d => (
-                <div key={d.key} style={s.barCol}>
-                  <div style={s.barTrack}>
-                    <div style={{ ...s.barFill, height: `${(d.count / maxBar) * 100}%`, background: d.key === today ? "#e8a838" : "#c97b2a", opacity: d.key === today ? 1 : 0.55 }} />
+            {/* Counter */}
+            <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "14px 16px 10px", flexShrink: 0 }}>
+              <p style={{ fontFamily: "'DM Mono'", fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: 2, marginBottom: 10 }}>aujourd'hui</p>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20 }}>
+                <button onClick={removeCig} style={{ width: 44, height: 44, borderRadius: "50%", border: "1.5px solid rgba(255,255,255,0.15)", background: "transparent", color: "#f2e8d5", fontSize: 24 }}>−</button>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 70, ...(pulse ? { animation: "pulseAnim 0.4s ease" } : {}) }}>
+                  <span style={{ fontSize: 52, fontWeight: 800, lineHeight: 1, color: "#e8a838" }}>{todayCount}</span>
+                  <span style={{ fontSize: 10, opacity: 0.4, fontFamily: "'DM Mono'" }}>cig</span>
+                </div>
+                <button onClick={addCig} style={{ width: 52, height: 52, borderRadius: "50%", border: "none", background: "#e8a838", color: "#1a1208", fontSize: 28, fontWeight: 800, boxShadow: "0 0 18px rgba(232,168,56,0.35)" }}>+</button>
+              </div>
+              <p style={{ fontFamily: "'DM Mono'", fontSize: 11, opacity: 0.45, textAlign: "center", marginTop: 8 }}>
+                ≈ {(todayCount * PRICE_PER_CIG).toFixed(2)} $ · {formatTime(todayCount * MINUTES_PER_CIG)} de vie
+              </p>
+            </div>
+
+            {/* 7 days chart */}
+            <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "12px 14px 10px", flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+              <p style={{ fontFamily: "'DM Mono'", fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: 2, marginBottom: 8, flexShrink: 0 }}>7 derniers jours</p>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 5, flex: 1, minHeight: 0 }}>
+                {last7.map(d => (
+                  <div key={d.key} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%", gap: 3 }}>
+                    <div style={{ flex: 1, width: "100%", background: "rgba(255,255,255,0.05)", borderRadius: 4, overflow: "hidden", display: "flex", alignItems: "flex-end" }}>
+                      <div style={{ width: "100%", borderRadius: 4, minHeight: 2, transition: "height 0.4s ease", height: `${(d.count / maxBar) * 100}%`, background: d.key === today ? "#e8a838" : "#c97b2a", opacity: d.key === today ? 1 : 0.55 }} />
+                    </div>
+                    <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.8 }}>{d.count}</span>
+                    <span style={{ fontSize: 8, opacity: 0.35, fontFamily: "'DM Mono'" }}>{d.label}</span>
                   </div>
-                  <span style={s.barNum}>{d.count}</span>
-                  <span style={s.barLabel}>{d.label}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Fact */}
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "10px 14px", flexShrink: 0 }}>
+              <span style={{ fontSize: 14 }}>💡</span>
+              <p key={factIndex} style={{ fontSize: 11, lineHeight: 1.55, opacity: 0.65, animation: "fadeUp 0.5s ease" }}>{HEALTH_FACTS[factIndex]}</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── STATS ── */}
+        {view === "stats" && (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "8px 16px 16px", gap: 10, zIndex: 1, overflow: "hidden" }}>
+
+            <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-1px", textAlign: "center" }}>stats</h1>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, flexShrink: 0 }}>
+              {[
+                { val: totalCigs, lbl: "cigarettes fumées" },
+                { val: `${totalMoney.toFixed(0)} $`, lbl: "dépensés" },
+                { val: avg.toFixed(1), lbl: "par jour en moy." },
+                { val: formatTime(totalMin), lbl: "de vie fumée" },
+              ].map(({ val, lbl }) => (
+                <div key={lbl} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: "14px 12px" }}>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: "#e8a838" }}>{val}</div>
+                  <div style={{ fontSize: 10, opacity: 0.4, fontFamily: "'DM Mono'", textTransform: "uppercase", letterSpacing: 0.8, marginTop: 4 }}>{lbl}</div>
                 </div>
               ))}
             </div>
-          </div>
 
-          <div style={s.factBox}>
-            <span style={s.factIcon}>💡</span>
-            <p style={s.factText} key={factIndex}>{HEALTH_FACTS[factIndex]}</p>
-          </div>
-        </div>
-      )}
-
-      {/* ── STATS ── */}
-      {view === "stats" && (
-        <div style={s.page}>
-          <div style={s.header}>
-            <h1 style={s.title}>stats</h1>
-          </div>
-
-          <div style={s.statsGrid}>
-            <div style={s.statCard}>
-              <span style={s.statBig}>{totalCigs}</span>
-              <span style={s.statLbl}>cigarettes fumées</span>
-            </div>
-            <div style={s.statCard}>
-              <span style={s.statBig}>{totalMoney.toFixed(0)} $</span>
-              <span style={s.statLbl}>dépensés</span>
-            </div>
-            <div style={s.statCard}>
-              <span style={s.statBig}>{avgPerDay}</span>
-              <span style={s.statLbl}>par jour en moy.</span>
-            </div>
-            <div style={s.statCard}>
-              <span style={s.statBig}>{formatTime(totalMinutes)}</span>
-              <span style={s.statLbl}>de vie fumée</span>
-            </div>
-          </div>
-
-          <div style={s.card}>
-            <p style={s.cardLabel}>si tu arrêtais aujourd'hui</p>
-            <div style={s.projRow}>
-              <div style={s.proj}>
-                <span style={s.projVal}>{(avgPerDay * 30 * PRICE_PER_CIG).toFixed(0)} $</span>
-                <span style={s.projLbl}>économisés / mois</span>
-              </div>
-              <div style={s.projDiv} />
-              <div style={s.proj}>
-                <span style={s.projVal}>{(avgPerDay * 365 * PRICE_PER_CIG).toFixed(0)} $</span>
-                <span style={s.projLbl}>économisés / an</span>
+            <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "14px 16px", flexShrink: 0 }}>
+              <p style={{ fontFamily: "'DM Mono'", fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: 2, marginBottom: 12 }}>si tu arrêtais aujourd'hui</p>
+              <div style={{ display: "flex", alignItems: "center" }}>
+                {[
+                  { val: `${(avg * 30 * PRICE_PER_CIG).toFixed(0)} $`, lbl: "économisés / mois" },
+                  { val: `${(avg * 365 * PRICE_PER_CIG).toFixed(0)} $`, lbl: "économisés / an" },
+                ].map(({ val, lbl }, i) => (
+                  <>
+                    {i === 1 && <div key="div" style={{ width: 1, height: 40, background: "rgba(255,255,255,0.08)" }} />}
+                    <div key={lbl} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                      <span style={{ fontSize: 22, fontWeight: 800, color: "#e8a838" }}>{val}</span>
+                      <span style={{ fontSize: 10, opacity: 0.4, fontFamily: "'DM Mono'", textTransform: "uppercase", letterSpacing: 0.8 }}>{lbl}</span>
+                    </div>
+                  </>
+                ))}
               </div>
             </div>
-          </div>
 
-          <div style={s.card}>
-            <p style={s.cardLabel}>⏳ temps de vie fumée</p>
-            <p style={s.bigTime}>{formatTime(totalMinutes)}</p>
-            <p style={s.bigTimeSub}>soit {formatTime(avgPerDay * MINUTES_PER_CIG)} perdues par jour</p>
-          </div>
-        </div>
-      )}
-
-      {/* ── HISTORY ── */}
-      {view === "history" && (
-        <div style={s.page}>
-          <div style={s.monthNav}>
-            <button style={s.monthArrow} onClick={() => {
-              const idx = allMonths.indexOf(historyMonth);
-              if (idx < allMonths.length - 1) setHistoryMonth(allMonths[idx + 1]);
-            }}>‹</button>
-            <span style={s.monthLabel}>{getMonthLabel(historyMonth)}</span>
-            <button style={s.monthArrow} onClick={() => {
-              const idx = allMonths.indexOf(historyMonth);
-              if (idx > 0) setHistoryMonth(allMonths[idx - 1]);
-            }}>›</button>
-          </div>
-
-          <div style={s.monthSummary}>
-            <div style={s.mStat}>
-              <span style={s.mStatVal}>{monthTotal}</span>
-              <span style={s.mStatLbl}>cigarettes</span>
-            </div>
-            <div style={s.mDiv} />
-            <div style={s.mStat}>
-              <span style={s.mStatVal}>{monthMoney} $</span>
-              <span style={s.mStatLbl}>dépensés</span>
-            </div>
-            <div style={s.mDiv} />
-            <div style={s.mStat}>
-              <span style={s.mStatVal}>{monthDays.filter(d => d <= today && data.days[d] !== undefined).length > 0 ? (monthTotal / monthDays.filter(d => d <= today && data.days[d] !== undefined).length).toFixed(1) : "—"}</span>
-              <span style={s.mStatLbl}>/ jour moy.</span>
+            <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "14px 16px", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
+              <p style={{ fontFamily: "'DM Mono'", fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: 2, marginBottom: 8 }}>⏳ temps de vie fumée</p>
+              <p style={{ fontSize: 38, fontWeight: 800, color: "#e8a838" }}>{formatTime(totalMin)}</p>
+              <p style={{ fontSize: 11, opacity: 0.4, fontFamily: "'DM Mono'", marginTop: 4 }}>soit {formatTime(avg * MINUTES_PER_CIG)} perdues par jour</p>
             </div>
           </div>
+        )}
 
-          {/* Calendar */}
-          <div style={s.card}>
-            <div style={s.calGrid}>
-              {["dim","lun","mar","mer","jeu","ven","sam"].map(d => (
-                <div key={d} style={s.calHeader}>{d}</div>
+        {/* ── HISTORY ── */}
+        {view === "history" && (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "8px 16px 16px", gap: 10, zIndex: 1, overflow: "hidden" }}>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+              <button onClick={() => { const i = allMonths.indexOf(historyMonth); if (i < allMonths.length - 1) setHistoryMonth(allMonths[i + 1]); }} style={{ background: "none", border: "none", color: "#e8a838", fontSize: 22, padding: "0 8px" }}>‹</button>
+              <span style={{ fontSize: 15, fontWeight: 700, textTransform: "capitalize" }}>{getMonthLabel(historyMonth)}</span>
+              <button onClick={() => { const i = allMonths.indexOf(historyMonth); if (i > 0) setHistoryMonth(allMonths[i - 1]); }} style={{ background: "none", border: "none", color: "#e8a838", fontSize: 22, padding: "0 8px" }}>›</button>
+            </div>
+
+            <div style={{ display: "flex", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, flexShrink: 0 }}>
+              {[
+                { val: monthTotal, lbl: "cigarettes" },
+                { val: `${(monthTotal * PRICE_PER_CIG).toFixed(0)} $`, lbl: "dépensés" },
+                { val: monthDaysLogged.length > 0 ? (monthTotal / monthDaysLogged.length).toFixed(1) : "—", lbl: "/ jour moy." },
+              ].map(({ val, lbl }, i) => (
+                <>
+                  {i > 0 && <div key={`d${i}`} style={{ width: 1, background: "rgba(255,255,255,0.08)", margin: "10px 0" }} />}
+                  <div key={lbl} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "12px 6px", gap: 3 }}>
+                    <span style={{ fontSize: 18, fontWeight: 800, color: "#e8a838" }}>{val}</span>
+                    <span style={{ fontSize: 9, opacity: 0.4, fontFamily: "'DM Mono'", textTransform: "uppercase", letterSpacing: 0.8 }}>{lbl}</span>
+                  </div>
+                </>
               ))}
-              {Array.from({ length: firstDayOfWeek }).map((_, i) => <div key={`e${i}`} />)}
-              {monthDays.map(day => {
+            </div>
+
+            {/* Calendar */}
+            <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "12px 10px", flexShrink: 0 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
+                {["dim","lun","mar","mer","jeu","ven","sam"].map(d => (
+                  <div key={d} style={{ textAlign: "center", fontSize: 8, opacity: 0.3, fontFamily: "'DM Mono'", paddingBottom: 4 }}>{d}</div>
+                ))}
+                {Array.from({ length: firstDOW }).map((_, i) => <div key={`e${i}`} />)}
+                {monthDays.map(day => {
+                  const count = data.days[day] || 0;
+                  const hasData = data.days[day] !== undefined;
+                  const isFuture = day > today;
+                  const intensity = hasData ? Math.min(count / maxDayMonth, 1) : 0;
+                  return (
+                    <div key={day} style={{ borderRadius: 7, padding: "4px 2px", display: "flex", flexDirection: "column", alignItems: "center", gap: 1, minHeight: 36, background: isFuture ? "transparent" : hasData ? `rgba(232,168,56,${0.08 + intensity * 0.5})` : "transparent", border: day === today ? "1px solid rgba(232,168,56,0.6)" : "1px solid transparent", opacity: isFuture ? 0.2 : 1 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.65 }}>{+day.split("-")[2]}</span>
+                      {!isFuture && hasData && <span style={{ fontSize: 11, fontWeight: 800, color: "#e8a838" }}>{count}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* List */}
+            <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "10px 14px", flex: 1, overflowY: "auto", minHeight: 0 }}>
+              <p style={{ fontFamily: "'DM Mono'", fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: 2, marginBottom: 6 }}>détail</p>
+              {monthDays.filter(d => d <= today).reverse().map(day => {
                 const count = data.days[day] || 0;
                 const hasData = data.days[day] !== undefined;
-                const isToday = day === today;
-                const isFuture = day > today;
-                const intensity = hasData ? Math.min(count / maxDayInMonth, 1) : 0;
                 return (
-                  <div key={day} style={{
-                    ...s.calDay,
-                    background: isFuture ? "transparent" : hasData ? `rgba(232,168,56,${0.1 + intensity * 0.5})` : "transparent",
-                    border: isToday ? "1px solid rgba(232,168,56,0.6)" : "1px solid transparent",
-                    opacity: isFuture ? 0.2 : 1,
-                  }}>
-                    <span style={s.calNum}>{+day.split("-")[2]}</span>
-                    {!isFuture && hasData && <span style={s.calCount}>{count}</span>}
+                  <div key={day} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                    <span style={{ fontSize: 12, width: 18, textAlign: "center" }}>{hasData ? (count === 0 ? "✦" : "🚬") : "·"}</span>
+                    <span style={{ flex: 1, fontSize: 11, opacity: 0.55, textTransform: "capitalize" }}>{formatDate(day)}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "'DM Mono'", color: hasData ? (count <= 2 ? "#e8a838" : count <= 4 ? "#c97b2a" : "#e05555") : "rgba(242,232,213,0.2)" }}>
+                      {hasData ? `${count} cig` : "—"}
+                    </span>
                   </div>
                 );
               })}
             </div>
           </div>
-
-          {/* Daily list */}
-          <div style={s.card}>
-            <p style={s.cardLabel}>détail</p>
-            {monthDays.filter(d => d <= today).reverse().map(day => {
-              const count = data.days[day] || 0;
-              const hasData = data.days[day] !== undefined;
-              return (
-                <div key={day} style={s.listRow}>
-                  <span style={s.listDot}>{hasData ? (count === 0 ? "✦" : "🚬") : "·"}</span>
-                  <span style={s.listDate}>{formatDate(day)}</span>
-                  <span style={{ ...s.listVal, color: hasData ? (count <= 2 ? "#e8a838" : count <= 4 ? "#c97b2a" : "#e05555") : "rgba(242,232,213,0.2)" }}>
-                    {hasData ? `${count} cig` : "—"}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital@0;1&display=swap');
-        @keyframes pulseAnim { 0%{transform:scale(1)} 50%{transform:scale(1.18)} 100%{transform:scale(1)} }
-        @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
-        * { box-sizing: border-box; }
-        button:active { opacity: 0.7; }
-      `}</style>
-    </div>
+        )}
+      </div>
+    </>
   );
 }
-
-const s = {
-  root: { height: "100dvh", width: "100%", background: "#1a1208", color: "#f2e8d5", fontFamily: "'Syne', sans-serif", display: "flex", flexDirection: "column", maxWidth: 440, margin: "0 auto", position: "relative", overflow: "hidden" },
-  grain: { position: "fixed", inset: 0, backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E\")", opacity: 0.4, pointerEvents: "none", zIndex: 0 },
-
-  nav: { display: "flex", gap: 4, padding: "12px 16px 0", background: "rgba(26,18,8,0.95)", flexShrink: 0, position: "relative", zIndex: 2 },
-  navBtn: { flex: 1, background: "none", border: "none", color: "rgba(242,232,213,0.35)", fontSize: 12, padding: "8px 0", borderRadius: 10, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontWeight: 700, transition: "all 0.2s", letterSpacing: "0.3px" },
-  navActive: { background: "rgba(232,168,56,0.12)", color: "#e8a838" },
-
-  page: { flex: 1, overflow: "hidden", padding: "14px 16px 20px", display: "flex", flexDirection: "column", gap: 10, position: "relative", zIndex: 1, justifyContent: "space-between" },
-
-  header: { textAlign: "center", marginBottom: 2 },
-  logo: { fontSize: 28 },
-  title: { fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, margin: "2px 0 0", letterSpacing: "-1px", color: "#f2e8d5" },
-
-on  card: { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "14px 16px 12px" },
-  cardLabel: { fontFamily: "'DM Mono', monospace", fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: 2, margin: "0 0 10px" },
-  cardSub: { fontFamily: "'DM Mono', monospace", fontSize: 11, opacity: 0.45, textAlign: "center", margin: "6px 0 0" },
-
-  counterRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 20 },
-  btnMinus: { width: 44, height: 44, borderRadius: "50%", border: "1.5px solid rgba(255,255,255,0.15)", background: "transparent", color: "#f2e8d5", fontSize: 24, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" },
-  btnPlus: { width: 52, height: 52, borderRadius: "50%", border: "none", background: "#e8a838", color: "#1a1208", fontSize: 28, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 18px rgba(232,168,56,0.35)" },
-  countDisplay: { display: "flex", flexDirection: "column", alignItems: "center", minWidth: 70 },
-  countNum: { fontSize: 56, fontWeight: 800, lineHeight: 1, color: "#e8a838" },
-  countUnit: { fontSize: 11, opacity: 0.4, fontFamily: "'DM Mono', monospace" },
-  pulse: { animation: "pulseAnim 0.4s ease" },
-
-  chartRow: { display: "flex", alignItems: "flex-end", gap: 5, height: 70 },
-  barCol: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%", gap: 3 },
-  barTrack: { flex: 1, width: "100%", background: "rgba(255,255,255,0.05)", borderRadius: 4, overflow: "hidden", display: "flex", alignItems: "flex-end" },
-  barFill: { width: "100%", borderRadius: 4, transition: "height 0.4s ease", minHeight: 2 },
-  barNum: { fontSize: 10, fontWeight: 700, opacity: 0.8 },
-  barLabel: { fontSize: 8, opacity: 0.35, fontFamily: "'DM Mono', monospace" },
-
-  factBox: { display: "flex", gap: 10, alignItems: "flex-start", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "12px 14px" },
-  factIcon: { fontSize: 15, marginTop: 1 },
-  factText: { margin: 0, fontSize: 12, lineHeight: 1.55, opacity: 0.65, animation: "fadeUp 0.5s ease" },
-
-  // Stats
-  statsGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 },
-  statCard: { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: "14px 12px", display: "flex", flexDirection: "column", gap: 4 },
-  statBig: { fontSize: 24, fontWeight: 800, color: "#e8a838" },
-  statLbl: { fontSize: 10, opacity: 0.4, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: 0.8 },
-
-  projRow: { display: "flex", alignItems: "center" },
-  proj: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 0", gap: 4 },
-  projVal: { fontSize: 22, fontWeight: 800, color: "#e8a838" },
-  projLbl: { fontSize: 10, opacity: 0.4, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: 0.8 },
-  projDiv: { width: 1, height: 40, background: "rgba(255,255,255,0.08)" },
-
-  bigTime: { fontSize: 36, fontWeight: 800, color: "#e8a838", margin: "4px 0 2px", textAlign: "center" },
-  bigTimeSub: { fontSize: 11, opacity: 0.4, fontFamily: "'DM Mono', monospace", textAlign: "center", margin: 0 },
-
-  // History
-  monthNav: { display: "flex", alignItems: "center", justifyContent: "space-between" },
-  monthArrow: { background: "none", border: "none", color: "#e8a838", fontSize: 22, cursor: "pointer", padding: "0 8px", lineHeight: 1 },
-  monthLabel: { fontSize: 15, fontWeight: 700, color: "#f2e8d5", textTransform: "capitalize" },
-
-  monthSummary: { display: "flex", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14 },
-  mStat: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "12px 6px", gap: 3 },
-  mStatVal: { fontSize: 18, fontWeight: 800, color: "#e8a838" },
-  mStatLbl: { fontSize: 9, opacity: 0.4, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: 0.8 },
-  mDiv: { width: 1, background: "rgba(255,255,255,0.08)", margin: "10px 0" },
-
-  calGrid: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 },
-  calHeader: { textAlign: "center", fontSize: 8, opacity: 0.3, fontFamily: "'DM Mono', monospace", paddingBottom: 5 },
-  calDay: { borderRadius: 7, padding: "4px 2px", display: "flex", flexDirection: "column", alignItems: "center", gap: 1, minHeight: 38 },
-  calNum: { fontSize: 10, fontWeight: 600, opacity: 0.65 },
-  calCount: { fontSize: 11, fontWeight: 800, color: "#e8a838" },
-
-  listRow: { display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" },
-  listDot: { fontSize: 12, width: 18, textAlign: "center" },
-  listDate: { flex: 1, fontSize: 11, opacity: 0.55, textTransform: "capitalize" },
-  listVal: { fontSize: 12, fontWeight: 700, fontFamily: "'DM Mono', monospace" },
-};
